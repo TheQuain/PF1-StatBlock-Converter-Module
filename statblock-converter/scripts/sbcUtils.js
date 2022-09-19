@@ -66,7 +66,7 @@ export class sbcUtils {
 
     static async resetTraits() {
         // Reset traits
-        return sbcData.characterData.actorData.data.update({
+        return sbcData.characterData.actorData.updateSource({
             data: {
                 traits: {
                     cres: "",
@@ -100,7 +100,7 @@ export class sbcUtils {
     }
 
     static async resetTokenData () {
-        return sbcData.characterData.actorData.data.update({
+        return sbcData.characterData.actorData.updateSource({
             token: {
                 displayName: sbcConfig.options.tokenSettings.displayName,
                 vision: sbcConfig.options.tokenSettings.vision,
@@ -157,7 +157,7 @@ export class sbcUtils {
     static async updatePreview() {
         this.resetPreview()
         let previewArea = $(".sbcContainer #sbcPreview")
-        let preview = await renderTemplate('modules/pf1-statblock-converter/templates/sbcPreview.hbs' , {data: sbcData.characterData.actorData.data, notes: sbcData.notes })
+        let preview = await renderTemplate('modules/pf1-statblock-converter/templates/sbcPreview.hbs' , {data: sbcData.characterData.actorData.system, notes: sbcData.notes })
         previewArea.append(preview)
     }
 
@@ -177,7 +177,7 @@ export class sbcUtils {
             actorTypeToggle.removeClass("createPC")
         }
         
-        sbcData.characterData.actorData.data.type = sbcConfig.const.actorType[sbcData.actorType]
+        sbcData.characterData.actorData.system.type = sbcConfig.const.actorType[sbcData.actorType]
 
     }
 
@@ -310,7 +310,7 @@ export class sbcUtils {
             }
             
             // Highlight the lines, in which an error occured
-            if (sbcData.preparedInput.data) {
+            if (sbcData.preparedInput) {
                 let highlights = $("#sbcHighlights")
                 let inputArea = $("#sbcInput")
                 let highlightedText = this.applyHighlights(errorLines)
@@ -354,16 +354,16 @@ export class sbcUtils {
             "packs" : searchableCompendiums
         }
 
-        searchResult = await game.pf1.utils.findInCompendia(input.name, searchOptions)
-
+        searchResult = await globalThis.pf1.utils.findInCompendia(input.name, searchOptions)
         // Return the searchResult, which either is a clone of the found entity or null
         if (searchResult !== false) {
-            let packName = searchResult.pack.metadata.package + "." + searchResult.pack.metadata.name
+            let packName = searchResult.pack.metadata.id
+/* searchResult.pack.metadata.package +  "pf1." + searchResult.pack.metadata.name */
 
-            let pack = await game.packs.get(packName)
-            foundEntity = await pack.getDocument(searchResult.index._id)
+            let pack = await game.packs.get(packName);
+            foundEntity = await pack.getDocument(searchResult.index._id);
 
-            let clone = await Item.create(foundEntity.data, {temporary: true})
+            let clone = await Item.create(foundEntity, {temporary: true})
             return clone;
 
         } else {
@@ -574,12 +574,12 @@ export class sbcUtils {
                 let spellBookToValidate = spellBooksToValidate[i]
                 let casterLevelToValidate = conversionValidation.spellBooks[spellBookToValidate].casterLevel
                 let concentrationBonusToValidate = conversionValidation.spellBooks[spellBookToValidate].concentrationBonus
-                let casterLevelInActor = actor.data.data.attributes.spells.spellbooks[spellBookToValidate].cl.total
+                let casterLevelInActor = actor.system.attributes.spells.spellbooks[spellBookToValidate].cl.total
 
-                let spellCastingAbility = actor.data.data.attributes.spells.spellbooks[spellBookToValidate].ability
-                let spellCastingAbilityModifier = actor.data.data.abilities[spellCastingAbility].mod
+                let spellCastingAbility = actor.system.attributes.spells.spellbooks[spellBookToValidate].ability
+                let spellCastingAbilityModifier = actor.system.abilities[spellCastingAbility].mod
                 
-                const concentrationBonusOnActor = actor.data.data.attributes.spells.spellbooks[spellBookToValidate].concentration.total;
+                const concentrationBonusOnActor = actor.system.attributes.spells.spellbooks[spellBookToValidate].concentration.total;
 
                 let differenceInCasterLevel = +casterLevelToValidate - +casterLevelInActor
                 let differenceInConcentrationBonus = +concentrationBonusToValidate - concentrationBonusOnActor
@@ -594,14 +594,14 @@ export class sbcUtils {
                 }
             }
 
-            if (!isObjectEmpty(bookUpdates)) {
+            if (!isEmpty(bookUpdates)) {
                 await actor.update(bookUpdates);
             }
 
             // Validate ability scores first as they can have cascading effects
             const abilityScoreKeys = ["str", "dex", "con", "int", "wis", "cha"];
             for (let abl of abilityScoreKeys) {
-                const totalInActor = actor.data.data.abilities[abl].total
+                const totalInActor = actor.system.abilities[abl].total
                 let totalInStatblock = conversionValidation.attributes[abl.capitalize()]
                 const difference = +totalInStatblock - +totalInActor
                 if (difference === 0) continue;
@@ -659,7 +659,7 @@ export class sbcUtils {
             attributesToValidate.push("acNormal", "acTouch", "acFlatFooted")
 
             // Get an array of all items the actor currently owns
-            let currentItems = await actor.data.items
+            let currentItems = await actor.items
      
             //let currentItemsKeys = Object.keys(currentItems)
             let currentItemsKeys = currentItems//.keys()
@@ -680,7 +680,7 @@ export class sbcUtils {
                     
                     let currentItemKey = currentItemsKeys[i]
                     let currentItem = currentItems[currentItemKey]
-                    let currentItemChanges = currentItem.data.changes
+                    let currentItemChanges = currentItem.changes
 
                     // Check, if the currentItem has changes to be considered
                     if (Array.isArray(currentItemChanges) && currentItemChanges.length) {
@@ -715,7 +715,7 @@ export class sbcUtils {
                     case "cmd":
                     case "cmb":
                     case "init":
-                        totalInActor = actor.data.data.attributes[attribute].total
+                        totalInActor = actor.system.attributes[attribute].total
                         modifier = "untypedPerm"
                         target = "misc"
                         subTarget = attribute
@@ -730,7 +730,7 @@ export class sbcUtils {
                         difference = +totalInStatblock
                         break
                     case "hptotal":
-                        totalInActor = actor.data.data.attributes.hp.max
+                        totalInActor = actor.system.attributes.hp.max
 
                         modifier = "untypedPerm"
                         target = "misc"
@@ -740,7 +740,7 @@ export class sbcUtils {
 
                         break
                     case "acnormal":
-                        totalInActor = actor.data.data.attributes.ac.normal.total
+                        totalInActor = actor.system.attributes.ac.normal.total
                         modifier = "untypedPerm"
                         target = "ac"
                         subTarget = "aac"
@@ -781,7 +781,7 @@ export class sbcUtils {
                         modifier = "untypedPerm"
                         target = "savingThrows"
                         subTarget = attribute
-                        totalInActor = actor.data.data.attributes.savingThrows[attribute].total ?? 0
+                        totalInActor = actor.system.attributes.savingThrows[attribute].total ?? 0
                         difference = +totalInStatblock - +totalInActor
                         break
                     default:
@@ -837,7 +837,7 @@ export class sbcUtils {
                 let skillToValidate = conversionValidation.skills[skillKey]
                 let skillModInActor = 0
                 
-                let skillSubKeys = Object.keys(actor.data.data.skills[parentSkillKey])
+                let skillSubKeys = Object.keys(actor.system.skills[parentSkillKey])
 
                 // For Skills with subskill --> subTarget: "skill.prf.subSkills.prf1"
                 let subTarget = ""
